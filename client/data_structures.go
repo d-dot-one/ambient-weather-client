@@ -20,7 +20,7 @@ type FunctionData struct {
 
 // String is a helper function to print the FunctionData struct as a string.
 func (f FunctionData) String() string {
-	r, _ := json.Marshal(f)
+	r, _ := json.Marshal(f) //nolint:all
 
 	return fmt.Sprint(string(r))
 }

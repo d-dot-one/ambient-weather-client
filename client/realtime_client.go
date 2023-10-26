@@ -34,6 +34,7 @@ func GetRealtimeData() (string, error) {
 		c.Close(websocket.StatusNormalClosure, "")
 
 	*/
-	_ := baseURLRealtime + apiVersionRealtime
-	return "", nil
+	url := baseURLRealtime + apiVersionRealtime
+
+	return url, nil
 }

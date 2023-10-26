@@ -1,8 +1,8 @@
 # Ambient Weather Network API Client
 
-## WIP
-1662409800000 = 2022-09-06 14:30:00
-1662496200000 = 2022-09-06 14:30:00
+## Warning
+
+This work is still very much in progress. I would not recommend that you use or fork it... not yet anyway.
 
 ## Overview
 
