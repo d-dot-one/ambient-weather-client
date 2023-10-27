@@ -46,6 +46,9 @@ const (
 	// retryMinWaitTimeSeconds An integer describing the minimum time to wait to retry
 	// an API call, in seconds.
 	retryMinWaitTimeSeconds = 5
+
+	// Version # of client
+	Version = "0.0.1"
 )
 
 // The ConvertTimeToEpoch help function can convert any Go time.Time object to a Unix epoch time in milliseconds.
