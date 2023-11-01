@@ -1,6 +1,10 @@
-// Package client is a client that can access the Ambient Weather network API and
-// return device and weather data.
-package client
+// Copyright 2023 d-dot-one. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
+
+// Package ambient_weather_client is a client that can access the Ambient Weather
+// network API and return device and weather data.
+package awn
 
 import (
 	"context"
@@ -12,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/resty.v1"
+	"github.com/go-resty/resty/v2"
 )
 
 const (
@@ -59,51 +63,53 @@ const (
 // The createAwnClient function is used to create a new resty-based API client. This client
 // supports retries and can be placed into debug mode when needed. By default, it will
 // also set the accept content type to JSON. Finally, it returns a pointer to the client.
-func createAwnClient() *resty.Client {
+func createAwnClient() (*resty.Client, error) {
 	client := resty.New().
 		SetRetryCount(retryCount).
 		SetRetryWaitTime(retryMinWaitTimeSeconds * time.Second).
 		SetRetryMaxWaitTime(retryMaxWaitTimeSeconds * time.Second).
-		SetHostURL(baseURL + apiVersion).
+		SetBaseURL(baseURL + apiVersion).
 		SetTimeout(defaultCtxTimeout * time.Second).
 		SetDebug(debugMode).
 		AddRetryCondition(
-			func(r *resty.Response) (bool, error) {
+			func(r *resty.Response, e error) bool {
 				return r.StatusCode() == http.StatusRequestTimeout ||
 					r.StatusCode() >= http.StatusInternalServerError ||
-					r.StatusCode() == http.StatusTooManyRequests, error(nil)
+					r.StatusCode() == http.StatusTooManyRequests
 			})
 
 	client.SetHeader("Accept", "application/json")
 
-	return client
+	return client, nil
 }
 
 // CreateAPIConfig is a helper function that is used to create the FunctionData struct,
-// which is passed to the data gathering functions.
-func CreateAPIConfig(api string, app string) FunctionData {
-	functionData := FunctionData{
-		Api: api,
-		App: app,
-		Ct:  createAwnClient(),
-	}
+// which is passed to the data gathering functions. It takes as parameters the API key
+// as api and the Application key as app and returns a pointer to a FunctionData object.
+func CreateAPIConfig(api string, app string) *FunctionData {
+	fd := NewFunctionData()
+	fd.API = api
+	fd.App = app
 
-	return functionData
+	return fd
 }
 
-// The GetDevices function takes a client, sets the appropriate query parameters for
-// authentication, makes the request to the devicesEndpoint endpoint and marshals the
+// GetDevices is a public function takes a client, sets the appropriate query parameters
+// for authentication, makes the request to the devicesEndpoint endpoint and marshals the
 // response data into a pointer to an AmbientDevice object, which is returned along with
 // any error messages.
 func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, error) {
-	funcData.Ct.SetQueryParams(map[string]string{
-		"apiKey":         funcData.Api,
+	client, err := createAwnClient()
+	CheckReturn(err, "unable to create client", "warning")
+
+	client.R().SetQueryParams(map[string]string{
+		"apiKey":         funcData.API,
 		"applicationKey": funcData.App,
 	})
 
 	deviceData := &AmbientDevice{}
 
-	_, err := funcData.Ct.R().SetResult(deviceData).Get(devicesEndpoint)
+	_, err = client.R().SetResult(deviceData).Get(devicesEndpoint)
 	CheckReturn(err, "unable to handle data from devicesEndpoint", "warning")
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -119,8 +125,11 @@ func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, erro
 // data is then marshaled into a pointer to a DeviceDataResponse object which is
 // returned to the caller along with any errors.
 func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataResponse, error) {
-	funcData.Ct.SetQueryParams(map[string]string{
-		"apiKey":         funcData.Api,
+	client, err := createAwnClient()
+	CheckReturn(err, "unable to create client", "warning")
+
+	client.R().SetQueryParams(map[string]string{
+		"apiKey":         funcData.API,
 		"applicationKey": funcData.App,
 		"endDate":        strconv.FormatInt(funcData.Epoch, 10),
 		"limit":          strconv.Itoa(funcData.Limit),
@@ -128,7 +137,7 @@ func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataRespon
 
 	deviceData := &DeviceDataResponse{}
 
-	_, err := funcData.Ct.R().
+	_, err = client.R().
 		SetPathParams(map[string]string{
 			"devicesEndpoint": devicesEndpoint,
 			"macAddress":      funcData.Mac,
@@ -150,8 +159,8 @@ func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataRespon
 	return *deviceData, err
 }
 
-// The GetHistoricalData function takes a FunctionData object as input and returns a and
-// will return a list of client.DeviceDataResponse object.
+// GetHistoricalData is a public function takes a FunctionData object as input and
+// returns a and will return a list of client.DeviceDataResponse object.
 func GetHistoricalData(ctx context.Context, funcData FunctionData) ([]DeviceDataResponse, error) {
 	var deviceResponse []DeviceDataResponse
 
@@ -187,6 +196,32 @@ func CheckReturn(err error, msg string, level LogLevelForError) {
 	}
 }
 
+// CheckResponse is a helper function that will take an API response and evaluate it for
+// for any errors that might have occurred. The API specification does not publish all of
+// the possible error messages, but these are what I have found so far.
+func CheckResponse(resp map[string]string) bool {
+	message, ok := resp["error"]
+	if ok {
+		switch message {
+		case "apiKey-missing":
+			log.Panicf("API key is missing (%v). Visit https://ambientweather.net/account", message)
+		case "applicationKey-missing":
+			log.Panicf("App key is missing (%v). Visit https://ambientweather.net/account", message)
+		case "date-invalid":
+			log.Panicf("Date is invalid (%v). It should be in epoch time in milliseconds", message)
+		case "macAddress-missing":
+			log.Panicf("MAC address is missing (%v). Supply a valid MAC address for a weather station", message)
+		default:
+			return true
+		}
+	}
+
+	return true
+}
+
+// GetHistoricalDataAsync is a public function that takes a context object, a FunctionData
+// object and a WaitGroup object as inputs. It will return a channel of DeviceDataResponse
+// objects and an error status.
 func GetHistoricalDataAsync(
 	ctx context.Context,
 	funcData FunctionData,

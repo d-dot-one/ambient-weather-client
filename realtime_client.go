@@ -1,6 +1,6 @@
 // this is obviously a work in progress.
 
-package client
+package awn
 
 const (
 	// apiVersionRealtime is a string and describes the version of the real-time API.

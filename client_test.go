@@ -1,4 +1,4 @@
-package client
+package awn
 
 import (
 	"context"
@@ -33,24 +33,23 @@ func TestCheckReturn(t *testing.T) {
 
 func TestCreateApiConfig(t *testing.T) {
 	t.Parallel()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	_, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
 	type args struct {
 		api string
 		app string
-		ctx context.Context
 	}
 	tests := []struct {
 		name string
 		args args
 		want FunctionData
 	}{
-		{"TestCreateApiConfig", args{"api", "app", ctx}, FunctionData{"api", "app", nil, ctx, 0, 0, ""}},
+		{name: "TestCreateApiConfig", args: args{"api", "app"}, want: FunctionData{"api", "app", 0, 1, ""}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CreateAPIConfig(tt.args.ctx, tt.args.api, tt.args.app); !reflect.DeepEqual(got, tt.want) {
+			if got := CreateAPIConfig(tt.args.api, tt.args.app); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CreateAPIConfig() = %v, want %v", got, tt.want)
 			}
 		})

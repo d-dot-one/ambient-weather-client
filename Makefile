@@ -1,8 +1,8 @@
 # Change these variables as necessary.
 # Stolen from https://www.alexedwards.net/blog/a-time-saving-makefile-for-your-go-projects
 #
-MAIN_PACKAGE_PATH := ./cmd/example
-BINARY_NAME := example
+MAIN_PACKAGE_PATH := .
+BINARY_NAME := awn
 
 # ==================================================================================== #
 # HELPERS
@@ -58,15 +58,14 @@ test:
 	go test -v -race -buildvcs ./...
 
 ## test/cover: run all tests and display coverage
-.PHONY: test/cover
-test/cover:
+.PHONY: cover
+cover:
 	go test -v -race -buildvcs -coverprofile=/tmp/coverage.out ./...
 	go tool cover -html=/tmp/coverage.out
 
 ## build: build the application
 .PHONY: build
 build:
-	# Include additional build steps, like TypeScript, SCSS or Tailwind compilation here...
 	go build -o=/tmp/bin/${BINARY_NAME} ${MAIN_PACKAGE_PATH}
 
 ## run: run the  application
