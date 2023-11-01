@@ -2,8 +2,8 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-// Package ambient_weather_client is a client that can access the Ambient Weather
-// network API and return device and weather data.
+// Package awn is a client that can access the Ambient Weather network API and return
+// device and weather data.
 package awn
 
 import (
@@ -50,9 +50,6 @@ const (
 	// retryMinWaitTimeSeconds An integer describing the minimum time to wait to retry
 	// an API call, in seconds.
 	retryMinWaitTimeSeconds = 5
-
-	// Version # of client
-	Version = "0.0.1"
 )
 
 // The ConvertTimeToEpoch help function can convert any Go time.Time object to a Unix epoch time in milliseconds.
@@ -196,8 +193,8 @@ func CheckReturn(err error, msg string, level LogLevelForError) {
 	}
 }
 
-// CheckResponse is a helper function that will take an API response and evaluate it for
-// for any errors that might have occurred. The API specification does not publish all of
+// CheckResponse is a helper function that will take an API response and evaluate it
+// for any errors that might have occurred. The API specification does not publish all
 // the possible error messages, but these are what I have found so far.
 func CheckResponse(resp map[string]string) bool {
 	message, ok := resp["error"]
