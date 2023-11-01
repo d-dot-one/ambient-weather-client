@@ -1,7 +1,7 @@
 module github.com/d-dot-one/ambient-weather-client
 
-go 1.21
+go 1.21.3
 
-require gopkg.in/resty.v1 v1.12.0
+require github.com/go-resty/resty/v2 v2.7.0
 
 require golang.org/x/net v0.17.0 // indirect

@@ -1,21 +1,21 @@
-package client
+package awn
 
 import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"gopkg.in/resty.v1"
 )
 
-// FunctionData is a struct that is used to pass data to the getDeviceData function.
+// FunctionData is a struct that is used to pass data basic API call parameters more
+// easily. It contains API (API key), App (Application key), Epoch (Unix epoch time in
+// milliseconds), Limit (maximum number of records to return in a single API call), and
+// Mac (MAC address of the weather station.
 type FunctionData struct {
-	Api   string        `json:"api"`
-	App   string        `json:"app"`
-	Ct    *resty.Client `json:"ct"`
-	Epoch int64         `json:"epoch"`
-	Limit int           `json:"limit"`
-	Mac   string        `json:"mac"`
+	API   string `json:"api"`
+	App   string `json:"app"`
+	Epoch int64  `json:"epoch"`
+	Limit int    `json:"limit"`
+	Mac   string `json:"mac"`
 }
 
 // String is a helper function to print the FunctionData struct as a string.
@@ -27,11 +27,10 @@ func (f FunctionData) String() string {
 
 // NewFunctionData creates a new FunctionData object with some default values and return
 // it to the caller as a pointer.
-func (f FunctionData) NewFunctionData(client *resty.Client) *FunctionData {
+func NewFunctionData() *FunctionData {
 	return &FunctionData{
-		Api:   "",
+		API:   "",
 		App:   "",
-		Ct:    client,
 		Epoch: 0,
 		Limit: 1,
 		Mac:   "",
