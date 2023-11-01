@@ -1,4 +1,4 @@
-module github.com/d-dot-one/ambient-weather-client
+module github.com/d-dot-one/awn
 
 go 1.21.3
 
