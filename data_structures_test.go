@@ -54,8 +54,8 @@ func TestFunctionData_String(t *testing.T) {
 
 	//epoch := time.Now().UnixMilli()
 
-	_, err := createAwnClient()
-	CheckReturn(err, "unable to create client", "warning")
+	_, err := CreateAwnClient()
+	_ = CheckReturn(err, "unable to create client", "warning")
 
 	type fields struct {
 		API   string
