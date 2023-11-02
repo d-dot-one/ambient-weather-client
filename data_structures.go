@@ -25,6 +25,17 @@ func (f FunctionData) String() string {
 	return fmt.Sprint(string(r))
 }
 
+// ToMap is a helper function to convert the FunctionData struct to a map.
+func (f FunctionData) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"api":   f.API,
+		"app":   f.App,
+		"epoch": f.Epoch,
+		"limit": f.Limit,
+		"mac":   f.Mac,
+	}
+}
+
 // NewFunctionData creates a new FunctionData object with some default values and return
 // it to the caller as a pointer.
 func NewFunctionData() *FunctionData {

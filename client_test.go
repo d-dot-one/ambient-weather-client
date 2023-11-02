@@ -36,6 +36,8 @@ func TestCreateApiConfig(t *testing.T) {
 	_, cancel := context.WithTimeout(context.Background(), time.Second*3)
 	defer cancel()
 
+	fd := FunctionData{"api", "app", 0, 1, ""}
+
 	type args struct {
 		api string
 		app string
@@ -43,9 +45,9 @@ func TestCreateApiConfig(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want FunctionData
+		want *FunctionData
 	}{
-		{name: "TestCreateApiConfig", args: args{"api", "app"}, want: FunctionData{"api", "app", 0, 1, ""}},
+		{name: "TestCreateApiConfig", args: args{"api", "app"}, want: &fd},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
