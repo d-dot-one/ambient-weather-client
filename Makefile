@@ -47,8 +47,18 @@ audit:
 # DEVELOPMENT
 # ==================================================================================== #
 
+# bench: run benchmarks on all files
+.PHONY: bench
+bench:
+	go test -v -bench=. ./... -benchmem
+
+# stat: run benchstat on an iteration of 5
+.PHONY: stat
+stat:
+	go test -v -bench=. ./... -benchmem -count=5 | benchstat -
+
 ## lint: run linter
-.PHONE: lint
+.PHONY: lint
 lint:
 	golangci-lint run
 

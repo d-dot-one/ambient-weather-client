@@ -52,20 +52,35 @@ const (
 	retryMinWaitTimeSeconds = 5
 )
 
-// The ConvertTimeToEpoch help function can convert any Go time.Time object to a Unix epoch time in milliseconds.
-// func ConvertTimeToEpoch(t time.Time) int64 {
-//	return t.UnixMilli()
-//}
+// The ConvertTimeToEpoch help function can convert a string, formatted as a time.DateOnly
+// object (2023-01-01) to a Unix epoch time in milliseconds. This can be helpful when you
+// want to use the GetHistoricalData function to fetch data for a specific date or range
+// of dates.
+//
+// Basic Usage:
+//
+//	epochTime, err := ConvertTimeToEpoch("2023-01-01")
+func ConvertTimeToEpoch(t string) (int64, error) {
+	parsed, err := time.Parse(time.DateOnly, t)
+	_ = CheckReturn(err, "unable to parse time", "warning")
 
-// The createAwnClient function is used to create a new resty-based API client. This client
+	return parsed.UnixMilli(), err
+}
+
+// The CreateAwnClient function is used to create a new resty-based API client. This client
 // supports retries and can be placed into debug mode when needed. By default, it will
 // also set the accept content type to JSON. Finally, it returns a pointer to the client.
-func createAwnClient() (*resty.Client, error) {
+//
+// Basic Usage:
+//
+//	client, err := createAwnClient()
+func CreateAwnClient() (*resty.Client, error) {
 	client := resty.New().
 		SetRetryCount(retryCount).
-		SetRetryWaitTime(retryMinWaitTimeSeconds * time.Second).
-		SetRetryMaxWaitTime(retryMaxWaitTimeSeconds * time.Second).
-		SetBaseURL(baseURL + apiVersion).
+		SetRetryWaitTime(retryMinWaitTimeSeconds*time.Second).
+		SetRetryMaxWaitTime(retryMaxWaitTimeSeconds*time.Second).
+		SetBaseURL(baseURL+apiVersion).
+		SetHeader("Accept", "application/json").
 		SetTimeout(defaultCtxTimeout * time.Second).
 		SetDebug(debugMode).
 		AddRetryCondition(
@@ -83,6 +98,10 @@ func createAwnClient() (*resty.Client, error) {
 // CreateAPIConfig is a helper function that is used to create the FunctionData struct,
 // which is passed to the data gathering functions. It takes as parameters the API key
 // as api and the Application key as app and returns a pointer to a FunctionData object.
+//
+// Basic Usage:
+//
+//	apiConfig := client.CreateApiConfig("apiTokenHere", "appTokenHere")
 func CreateAPIConfig(api string, app string) *FunctionData {
 	fd := NewFunctionData()
 	fd.API = api
@@ -95,9 +114,15 @@ func CreateAPIConfig(api string, app string) *FunctionData {
 // for authentication, makes the request to the devicesEndpoint endpoint and marshals the
 // response data into a pointer to an AmbientDevice object, which is returned along with
 // any error messages.
+//
+// Basic Usage:
+//
+//	ctx := createContext()
+//	ApiConfig := client.CreateApiConfig(apiKey, appKey)
+//	data, err := client.GetDevices(ApiConfig)
 func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, error) {
-	client, err := createAwnClient()
-	CheckReturn(err, "unable to create client", "warning")
+	client, err := CreateAwnClient()
+	_ = CheckReturn(err, "unable to create client", "warning")
 
 	client.R().SetQueryParams(map[string]string{
 		"apiKey":         funcData.API,
@@ -107,7 +132,7 @@ func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, erro
 	deviceData := &AmbientDevice{}
 
 	_, err = client.R().SetResult(deviceData).Get(devicesEndpoint)
-	CheckReturn(err, "unable to handle data from devicesEndpoint", "warning")
+	_ = CheckReturn(err, "unable to handle data from devicesEndpoint", "warning")
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, errors.New("context timeout exceeded")
@@ -121,9 +146,15 @@ func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, erro
 // number of records to fetch in this API call to the macAddress endpoint. The response
 // data is then marshaled into a pointer to a DeviceDataResponse object which is
 // returned to the caller along with any errors.
+//
+// Basic Usage:
+//
+//	ctx := createContext()
+//	apiConfig := client.CreateApiConfig(apiKey, appKey)
+//	resp, err := getDeviceData(ctx, apiConfig)
 func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataResponse, error) {
-	client, err := createAwnClient()
-	CheckReturn(err, "unable to create client", "warning")
+	client, err := CreateAwnClient()
+	_ = CheckReturn(err, "unable to create client", "warning")
 
 	client.R().SetQueryParams(map[string]string{
 		"apiKey":         funcData.API,
@@ -141,13 +172,9 @@ func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataRespon
 		}).
 		SetResult(deviceData).
 		Get("{devicesEndpoint}/{macAddress}")
-	CheckReturn(err, "unable to handle data from the devices endpoint", "warning")
-	// todo: check call for errors passed through resp
-	// if mac is missing, you get the devices endpoint response, so test for mac address
-	// if apiKey is missing, you get {"error": "apiKey-missing"}
-	// if appKey is missing, you get {"error": "applicationKey-missing"}
-	// if date is wrong, you get {"error":"date-invalid","message":"Please refer
-	//		to: http://momentjs.com/docs/#/parsing/string/"}
+	_ = CheckReturn(err, "unable to handle data from the devices endpoint", "warning")
+
+	//CheckResponse(resp) // todo: check call for errors passed through resp
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, errors.New("ctx timeout exceeded")
@@ -158,6 +185,12 @@ func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataRespon
 
 // GetHistoricalData is a public function takes a FunctionData object as input and
 // returns a and will return a list of client.DeviceDataResponse object.
+//
+// Basic Usage:
+//
+//	ctx := createContext()
+//	apiConfig := client.CreateApiConfig(apiKey, appKey)
+//	resp, err := GetHistoricalData(ctx, apiConfig)
 func GetHistoricalData(ctx context.Context, funcData FunctionData) ([]DeviceDataResponse, error) {
 	var deviceResponse []DeviceDataResponse
 
@@ -165,7 +198,7 @@ func GetHistoricalData(ctx context.Context, funcData FunctionData) ([]DeviceData
 		funcData.Epoch = i
 
 		resp, err := getDeviceData(ctx, funcData)
-		CheckReturn(err, "unable to get device data", "warning")
+		_ = CheckReturn(err, "unable to get device data", "warning")
 
 		deviceResponse = append(deviceResponse, resp)
 	}
@@ -175,8 +208,17 @@ func GetHistoricalData(ctx context.Context, funcData FunctionData) ([]DeviceData
 
 type LogLevelForError string
 
-// CheckReturn is a helper function to remove the usual error checking cruft.
-func CheckReturn(err error, msg string, level LogLevelForError) {
+// CheckReturn is a helper function to remove the usual error checking cruft while also
+// logging the error message. It takes an error, a message and a log level as inputs and
+// returns an error (can be nil of course).
+//
+// Basic Usage:
+//
+//	err = CheckReturn(err, "unable to get device data", "warning")
+//	if err != nil {
+//		log.Printf("Error: %v", err)
+//	}
+func CheckReturn(err error, msg string, level LogLevelForError) error {
 	if err != nil {
 		switch level {
 		case "panic":
@@ -191,11 +233,14 @@ func CheckReturn(err error, msg string, level LogLevelForError) {
 			log.Printf("%v: %x\n", msg, err)
 		}
 	}
+	return err
 }
 
 // CheckResponse is a helper function that will take an API response and evaluate it
 // for any errors that might have occurred. The API specification does not publish all
 // the possible error messages, but these are what I have found so far.
+//
+// This is not currently implemented.
 func CheckResponse(resp map[string]string) bool {
 	message, ok := resp["error"]
 	if ok {
@@ -232,7 +277,7 @@ func GetHistoricalDataAsync(
 			funcData.Epoch = i
 
 			resp, err := getDeviceData(ctx, funcData)
-			CheckReturn(err, "unable to get device data", "warning")
+			_ = CheckReturn(err, "unable to get device data", "warning")
 
 			out <- resp
 		}
@@ -244,6 +289,10 @@ func GetHistoricalDataAsync(
 
 // GetEnvVars is a public function that will attempt to read the environment variables that
 // are passed in as a list of strings. It will return a map of the environment variables.
+//
+// Basic Usage:
+//
+//	listOfEnvironmentVariables := GetEnvVars([]string{"ENV_VAR_1", "ENV_VAR_2"})
 func GetEnvVars(vars []string) map[string]string {
 	envVars := make(map[string]string)
 
@@ -257,6 +306,10 @@ func GetEnvVars(vars []string) map[string]string {
 
 // GetEnvVar is a public function attempts to fetch an environment variable. If that
 // environment variable is not found, it will return 'fallback'.
+//
+// Basic Usage:
+//
+//	environmentVariable := GetEnvVar("ENV_VAR_1", "fallback")
 func GetEnvVar(key string, fallback string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
