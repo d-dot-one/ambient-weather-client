@@ -2,14 +2,13 @@ package awn
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 )
 
 // FunctionData is a struct that is used to pass data basic API call parameters more
 // easily. It contains API (API key), App (Application key), Epoch (Unix epoch time in
 // milliseconds), Limit (maximum number of records to return in a single API call), and
-// Mac (MAC address of the weather station.
+// Mac (MAC address of the weather station).
 type FunctionData struct {
 	API   string `json:"api"`
 	App   string `json:"app"`
@@ -20,9 +19,9 @@ type FunctionData struct {
 
 // String is a helper function to print the FunctionData struct as a string.
 func (f FunctionData) String() string {
-	r, _ := json.Marshal(f) //nolint:all
+	r, _ := json.Marshal(f)
 
-	return fmt.Sprint(string(r))
+	return string(r)
 }
 
 // ToMap is a helper function to convert the FunctionData struct to a map.
@@ -90,7 +89,7 @@ type DeviceDataResponse []struct {
 func (d DeviceDataResponse) String() string {
 	r, _ := json.Marshal(d)
 
-	return fmt.Sprint(string(r))
+	return string(r)
 }
 
 // DeviceData is used to marshal/unmarshal the response from the
@@ -175,7 +174,7 @@ type AmbientDevice []struct {
 // String is a helper function to print the AmbientDevice struct as a string.
 func (a AmbientDevice) String() string {
 	r, err := json.Marshal(a)
-	CheckReturn(err, "unable to marshall json from AmbientDevice", "warning")
+	_ = CheckReturn(err, "unable to marshall json from AmbientDevice", "warning")
 
-	return fmt.Sprint(string(r))
+	return string(r)
 }

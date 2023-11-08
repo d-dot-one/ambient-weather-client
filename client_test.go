@@ -8,6 +8,31 @@ import (
 	"time"
 )
 
+func TestConvertTimeToEpoch(t *testing.T) {
+	type args struct {
+		t string
+	}
+	tests := []struct {
+		name string
+		t    string
+		want int64
+	}{
+		{"Test01Jan2014ToEpoch", "2014-01-01", 1388534400000},
+		{"Test15Nov2023ToEpoch", "2023-11-15", 1700006400000},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			i, err := ConvertTimeToEpoch(tt.t)
+			err = CheckReturn(err, "Error converting time to epoch", "warning")
+			if err != nil {
+				t.Errorf("CheckReturn() error = %v", err)
+			}
+			if got, _ := ConvertTimeToEpoch(tt.t); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ConvertTimeToEpoch() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 func TestCheckReturn(t *testing.T) {
 	t.Parallel()
 	type args struct {
@@ -26,7 +51,7 @@ func TestCheckReturn(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			CheckReturn(tt.args.e, tt.args.msg, tt.args.level)
+			_ = CheckReturn(tt.args.e, tt.args.msg, tt.args.level)
 		})
 	}
 }

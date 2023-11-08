@@ -9,6 +9,7 @@ package awn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -51,6 +52,10 @@ const (
 	// an API call, in seconds.
 	retryMinWaitTimeSeconds = 5
 )
+
+// ErrContextTimeoutExceeded is an error message that is returned when the context has
+// timed out.
+var ErrContextTimeoutExceeded = errors.New("context timeout exceeded")
 
 // The ConvertTimeToEpoch help function can convert a string, formatted as a time.DateOnly
 // object (2023-01-01) to a Unix epoch time in milliseconds. This can be helpful when you
@@ -135,10 +140,10 @@ func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, erro
 	_ = CheckReturn(err, "unable to handle data from devicesEndpoint", "warning")
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, errors.New("context timeout exceeded")
+		return nil, fmt.Errorf("%q: %w", deviceData, ErrContextTimeoutExceeded)
 	}
 
-	return *deviceData, err
+	return *deviceData, fmt.Errorf("%w", err)
 }
 
 // The getDeviceData function takes a client and the Ambient Weather device MAC address
@@ -174,13 +179,13 @@ func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataRespon
 		Get("{devicesEndpoint}/{macAddress}")
 	_ = CheckReturn(err, "unable to handle data from the devices endpoint", "warning")
 
-	//CheckResponse(resp) // todo: check call for errors passed through resp
+	// CheckResponse(resp) // todo: check call for errors passed through resp
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, errors.New("ctx timeout exceeded")
+		return nil, ErrContextTimeoutExceeded
 	}
 
-	return *deviceData, err
+	return *deviceData, fmt.Errorf("%w", err)
 }
 
 // GetHistoricalData is a public function takes a FunctionData object as input and
@@ -207,6 +212,7 @@ func GetHistoricalData(ctx context.Context, funcData FunctionData) ([]DeviceData
 }
 
 type LogLevelForError string
+type LogMessage string
 
 // CheckReturn is a helper function to remove the usual error checking cruft while also
 // logging the error message. It takes an error, a message and a log level as inputs and
@@ -218,7 +224,7 @@ type LogLevelForError string
 //	if err != nil {
 //		log.Printf("Error: %v", err)
 //	}
-func CheckReturn(err error, msg string, level LogLevelForError) error {
+func CheckReturn(err error, msg LogMessage, level LogLevelForError) error {
 	if err != nil {
 		switch level {
 		case "panic":
@@ -233,6 +239,7 @@ func CheckReturn(err error, msg string, level LogLevelForError) error {
 			log.Printf("%v: %x\n", msg, err)
 		}
 	}
+
 	return err
 }
 

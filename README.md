@@ -2,7 +2,7 @@
 
 ## Warning
 
-This work is still very much in progress. I would not recommend that you use or fork it... not yet anyway.
+**This work is still very much in progress. I would not recommend that you use or fork it... not yet anyway.**
 
 ## Overview
 
@@ -16,7 +16,8 @@ go get github.com/d-dot-one/ambient-weather-network-client
 ... or you can simply import it in your project and use it.
 
 ```go
-import "github.com/d-dot-one/ambient-weather-network-client"
+package yourpackagename
+import "github.com/d-dot-one/awn"
 ```
 You'll need to do a `go get` in the terminal to actually fetch the package.
 
@@ -42,15 +43,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
-	client "github.com/d-dot-one/ambient-weather-network-client"
+	client "github.com/d-dot-one/awn"
 )
 
 func main() {
 	// create a context
-	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-	
+
 	// fetch required environment variables
 	requiredVars := []string{"AWN_API_KEY", "AWN_APP_KEY", "AWN_LOG_LEVEL"}
 	environmentVariables := client.GetEnvVars(requiredVars)
@@ -67,28 +69,30 @@ func main() {
 	// fetch the device data and return it as an AmbientDevice
 	data, err := client.GetDevices(ApiConfig)
 	client.CheckReturn(err, "failed to get devices", "critical")
-	
+
 	// see the MAC address of the weather station
 	fmt.Println(data.MacAddress)
 }
 ```
 
 ### Get Historical Weather Station Data
+
 ```go
 package main
 
 import (
 	"context"
 	"fmt"
+	"time"
 
-	client "github.com/d-dot-one/ambient-weather-network-client"
+	client "github.com/d-dot-one/awn"
 )
 
 func main() {
 	// create a context
-	ctx, cancel := context.WithTimeout(context.Background(), contextTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
 	defer cancel()
-	
+
 	// fetch required environment variables
 	requiredVars := []string{"AWN_API_KEY", "AWN_APP_KEY", "AWN_LOG_LEVEL"}
 	environmentVariables := client.GetEnvVars(requiredVars)
@@ -105,7 +109,7 @@ func main() {
 	// fetch the device data and return it as an AmbientDevice
 	data, err := client.GetDevices(ApiConfig)
 	client.CheckReturn(err, "failed to get devices", "critical")
-	
+
 	// see the MAC address of the weather station
 	fmt.Println(data.MacAddress)
 }
