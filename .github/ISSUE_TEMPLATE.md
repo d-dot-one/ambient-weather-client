@@ -1,5 +1,4 @@
-Thank your for caring and for creating an issue. Please do not submit security issues here, but do follow the
-[Security Policy](../SECURITY.md).
+Thank your for caring and for creating an issue. Please do not submit security issues here, but do follow the [Security Policy](../SECURITY.md).
 
 ## Checklist
 - [ ] Is this something you can **debug and fix**? Submit a pull request! Bug fixes and documentation fixes are welcome.

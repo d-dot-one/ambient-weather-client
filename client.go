@@ -9,9 +9,11 @@ package awn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -52,6 +54,39 @@ const (
 	retryMinWaitTimeSeconds = 5
 )
 
+// ErrContextTimeoutExceeded is an error message that is returned when the context has
+// timed out.
+var ErrContextTimeoutExceeded = errors.New("context timeout exceeded")
+var ErrMalformedDate = errors.New("date format is malformed. should be YYYY-MM-DD")
+var ErrRegexFailed = errors.New("regex failed")
+
+// LogLevelForError is a type that describes the log level for an error message.
+type LogLevelForError string
+
+// LogMessage is the message that you would like to see in the log.
+type LogMessage string
+
+// YearMonthDay is a type that describes a date in the format YYYY-MM-DD.
+type YearMonthDay string
+
+// verify is a private helper function that will verify that the date is in the correct
+// format. It will return a boolean value.
+func (y YearMonthDay) verify() (bool, error) {
+	match, err := regexp.MatchString(`\d{4}-\d{2}-\d{2}`, y.String())
+	if err != nil {
+		return false, ErrRegexFailed
+	}
+	if !match {
+		return false, ErrMalformedDate
+	}
+	return true, nil
+}
+
+// String is a public helper function that will return the YearMonthDay object as a string.
+func (y YearMonthDay) String() string {
+	return string(y)
+}
+
 // The ConvertTimeToEpoch help function can convert a string, formatted as a time.DateOnly
 // object (2023-01-01) to a Unix epoch time in milliseconds. This can be helpful when you
 // want to use the GetHistoricalData function to fetch data for a specific date or range
@@ -60,11 +95,18 @@ const (
 // Basic Usage:
 //
 //	epochTime, err := ConvertTimeToEpoch("2023-01-01")
-func ConvertTimeToEpoch(t string) (int64, error) {
-	parsed, err := time.Parse(time.DateOnly, t)
-	_ = CheckReturn(err, "unable to parse time", "warning")
+func ConvertTimeToEpoch(ymd YearMonthDay) (int64, error) {
+	result, err := ymd.verify()
+	if err != nil {
+		return 0, ErrMalformedDate
+	}
 
-	return parsed.UnixMilli(), err
+	if result {
+		parsed, err := time.Parse(time.DateOnly, ymd.String())
+		_ = CheckReturn(err, "unable to parse time", "warning")
+		return parsed.UnixMilli(), err
+	}
+	return 0, ErrMalformedDate
 }
 
 // The CreateAwnClient function is used to create a new resty-based API client. This client
@@ -135,10 +177,10 @@ func GetDevices(ctx context.Context, funcData FunctionData) (AmbientDevice, erro
 	_ = CheckReturn(err, "unable to handle data from devicesEndpoint", "warning")
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, errors.New("context timeout exceeded")
+		return nil, fmt.Errorf("%q: %w", deviceData, ErrContextTimeoutExceeded)
 	}
 
-	return *deviceData, err
+	return *deviceData, fmt.Errorf("%w", err)
 }
 
 // The getDeviceData function takes a client and the Ambient Weather device MAC address
@@ -174,13 +216,13 @@ func getDeviceData(ctx context.Context, funcData FunctionData) (DeviceDataRespon
 		Get("{devicesEndpoint}/{macAddress}")
 	_ = CheckReturn(err, "unable to handle data from the devices endpoint", "warning")
 
-	//CheckResponse(resp) // todo: check call for errors passed through resp
+	// CheckResponse(resp) // todo: check call for errors passed through resp
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return nil, errors.New("ctx timeout exceeded")
+		return nil, ErrContextTimeoutExceeded
 	}
 
-	return *deviceData, err
+	return *deviceData, fmt.Errorf("%w", err)
 }
 
 // GetHistoricalData is a public function takes a FunctionData object as input and
@@ -206,8 +248,6 @@ func GetHistoricalData(ctx context.Context, funcData FunctionData) ([]DeviceData
 	return deviceResponse, nil
 }
 
-type LogLevelForError string
-
 // CheckReturn is a helper function to remove the usual error checking cruft while also
 // logging the error message. It takes an error, a message and a log level as inputs and
 // returns an error (can be nil of course).
@@ -218,7 +258,7 @@ type LogLevelForError string
 //	if err != nil {
 //		log.Printf("Error: %v", err)
 //	}
-func CheckReturn(err error, msg string, level LogLevelForError) error {
+func CheckReturn(err error, msg LogMessage, level LogLevelForError) error {
 	if err != nil {
 		switch level {
 		case "panic":
@@ -233,6 +273,7 @@ func CheckReturn(err error, msg string, level LogLevelForError) error {
 			log.Printf("%v: %x\n", msg, err)
 		}
 	}
+
 	return err
 }
 
