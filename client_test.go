@@ -9,12 +9,9 @@ import (
 )
 
 func TestConvertTimeToEpoch(t *testing.T) {
-	type args struct {
-		t string
-	}
 	tests := []struct {
 		name string
-		t    string
+		t    YearMonthDay
 		want int64
 	}{
 		{"Test01Jan2014ToEpoch", "2014-01-01", 1388534400000},
@@ -22,22 +19,39 @@ func TestConvertTimeToEpoch(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i, err := ConvertTimeToEpoch(tt.t)
-			err = CheckReturn(err, "Error converting time to epoch", "warning")
-			if err != nil {
-				t.Errorf("CheckReturn() error = %v", err)
-			}
 			if got, _ := ConvertTimeToEpoch(tt.t); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ConvertTimeToEpoch() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
+
+func TestConvertTimeToEpochBadFormat(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		t    YearMonthDay
+		want error
+	}{
+		{"TestWrongDateFormat", "11-15-2021", ErrMalformedDate},
+		{"TestWrongDateFormat", "11152021", ErrMalformedDate},
+		{"TestWrongDateFormat", "11-15-2021:12:42", ErrMalformedDate},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ConvertTimeToEpoch(tt.t)
+			if err == nil {
+				t.Errorf("ConvertTimeToEpoch() = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestCheckReturn(t *testing.T) {
 	t.Parallel()
 	type args struct {
 		e     error
-		msg   string
+		msg   LogMessage
 		level LogLevelForError
 	}
 	tests := []struct {
@@ -47,8 +61,9 @@ func TestCheckReturn(t *testing.T) {
 		{"TestCheckReturnDebug", args{nil, "Debug log message", "debug"}},
 		{"TestCheckReturnInfo", args{nil, "Info log message", "info"}},
 		{"TestCheckReturnWarning", args{nil, "Warning log message", "warning"}},
+		{"TestCheckReturnFatal", args{nil, "Fatal log message", "fatal"}},
+		{"TestCheckReturnPanic", args{nil, "Panic log message", "panic"}},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_ = CheckReturn(tt.args.e, tt.args.msg, tt.args.level)
