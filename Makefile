@@ -70,13 +70,15 @@ test:
 ## test/cover: run all tests and display coverage
 .PHONY: cover
 cover:
-	go test -v -race -buildvcs -coverprofile=/tmp/coverage.out ./...
-	go tool cover -html=/tmp/coverage.out
+	export GOCOVERDIR=./artifacts/
+#	go build -cover -o=./bin/${BINARY_NAME} ${MAIN_PACKAGE_PATH}
+	go test -v -race -covermode=atomic -buildvcs -coverprofile=./artifacts/coverage.out ./...
+	#go tool cover -html=./artifacts/coverage.out
 
 ## build: build the application
 .PHONY: build
 build:
-	go build -o=/tmp/bin/${BINARY_NAME} ${MAIN_PACKAGE_PATH}
+	go build -o=./bin/${BINARY_NAME} ${MAIN_PACKAGE_PATH}
 
 ## run: run the  application
 .PHONY: run

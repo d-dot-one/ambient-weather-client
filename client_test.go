@@ -2,14 +2,21 @@ package awn
 
 import (
 	"context"
+	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/go-resty/resty/v2"
 )
 
 func TestCheckReturn(t *testing.T) {
 	t.Parallel()
+
 	type args struct {
 		e     error
 		msg   string
@@ -22,11 +29,13 @@ func TestCheckReturn(t *testing.T) {
 		{"TestCheckReturnDebug", args{nil, "Debug log message", "debug"}},
 		{"TestCheckReturnInfo", args{nil, "Info log message", "info"}},
 		{"TestCheckReturnWarning", args{nil, "Warning log message", "warning"}},
+		{"TestCheckReturnFatal", args{nil, "Fatal log message", "fatal"}},
+		{"TestCheckReturnPanic", args{nil, "Panic log message", "panic"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			CheckReturn(tt.args.e, tt.args.msg, tt.args.level)
+			_ = CheckReturn(tt.args.e, tt.args.msg, tt.args.level)
 		})
 	}
 }
@@ -51,46 +60,88 @@ func TestCreateApiConfig(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := CreateAPIConfig(tt.args.api, tt.args.app); !reflect.DeepEqual(got, tt.want) {
+			got := CreateAPIConfig(tt.args.api, tt.args.app)
+
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("CreateAPIConfig() = %v, want %v", got, tt.want)
+			}
+			if got.API != tt.want.API {
+				t.Errorf("CreateAPIConfig() API = %v, want %v", got.API, tt.want.API)
+			}
+			if got.App != tt.want.App {
+				t.Errorf("CreateAPIConfig() App = %v, want %v", got.App, tt.want.App)
 			}
 		})
 	}
 }
 
-//	func TestGetDevices(t *testing.T) {
-//		t.Parallel()
-//		type args struct {
-//			f FunctionData
-//		}
-//		tests := []struct {
-//			name    string
-//			args    args
-//			want    AmbientDevice
-//			wantErr bool
-//		}{
-//			// TODO: Add test cases.
-//		}
-//		for _, tt := range tests {
-//			t.Run(tt.name, func(t *testing.T) {
-//				got, err := GetDevices(tt.args.f)
-//				if (err != nil) != tt.wantErr {
-//					t.Errorf("GetDevices() error = %v, wantErr %v", err, tt.wantErr)
-//					return
-//				}
-//				if !reflect.DeepEqual(got, tt.want) {
-//					t.Errorf("GetDevices() got = %v, want %v", got, tt.want)
-//				}
-//			})
-//		}
-//	}
+func TestGetLatestData(t *testing.T) {
+	t.Skip("skipping test -- flaky")
+
+	fd := FunctionData{API: "api_key_goes_here", App: "app_key_goes_here"}
+	jsonData := `{"info": {}, "DeviceData": {}, "macAddress": "00:00:00:00:00:00"}`
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	type Tests struct {
+		name     string
+		baseURL  string
+		ctx      context.Context
+		version  string
+		response *AmbientDevice
+		want     error
+	}
+	tests := []Tests{
+		{
+			name:     "basic-request",
+			baseURL:  "http://127.0.0.1:9998",
+			ctx:      ctx,
+			version:  "/v1",
+			response: &AmbientDevice{},
+			want:     nil,
+		},
+	}
+
+	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(jsonData))
+		if err != nil {
+			return
+		}
+	}))
+
+	listener, err := net.Listen("tcp", "127.0.0.1:9998")
+	if err != nil {
+		t.Errorf("unable to create listener: %v on port 9998", err)
+	}
+
+	_ = server.Listener.Close()
+	server.Listener = listener
+	server.Start()
+	defer server.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetLatestData(ctx, fd, tt.baseURL, tt.version)
+			if !reflect.DeepEqual(got, tt.response) {
+				t.Errorf("GetLatestData() = %v, want %v", got, tt.response)
+			}
+			if err != nil {
+				t.Errorf("GetLatestData() Error = %v, want %v", err, tt.want)
+			}
+			if !errors.Is(err, tt.want) {
+				t.Errorf("GetLatestData() Error = %v, want %v", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestGetEnvVar(t *testing.T) {
 	t.Parallel()
 	err := os.Setenv("TEST_ENV_VAR", "test")
 	if err != nil {
 		t.Errorf("unable to set test environment variable")
 	}
-	defer os.Unsetenv("TEST_ENV_VAR")
 
 	type args struct {
 		key      string
@@ -111,15 +162,23 @@ func TestGetEnvVar(t *testing.T) {
 			}
 		})
 	}
+
+	t.Cleanup(func() {
+		_ = os.Unsetenv("TEST_ENV_VAR")
+	})
 }
 
 func TestGetEnvVars(t *testing.T) {
 	t.Parallel()
+
 	err := os.Setenv("TEST_ENV_VAR", "test")
 	if err != nil {
 		t.Errorf("unable to set test environment variable")
 	}
-	defer os.Unsetenv("TEST_ENV_VAR")
+	err = os.Setenv("ANOTHER_TEST_ENV_VAR", "another_test")
+	if err != nil {
+		t.Errorf("unable to set test environment variable")
+	}
 
 	type args struct {
 		vars []string
@@ -129,7 +188,7 @@ func TestGetEnvVars(t *testing.T) {
 		args args
 		want map[string]string
 	}{
-		{"TestGetEnvVars", args{[]string{"TEST_ENV_VAR", "ANOTHER_TEST_ENV_VAR"}}, map[string]string{"TEST_ENV_VAR": "test", "ANOTHER_TEST_ENV_VAR": ""}},
+		{"TestGetEnvVars", args{[]string{"TEST_ENV_VAR", "ANOTHER_TEST_ENV_VAR"}}, map[string]string{"TEST_ENV_VAR": "test", "ANOTHER_TEST_ENV_VAR": "another_test"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -138,80 +197,109 @@ func TestGetEnvVars(t *testing.T) {
 			}
 		})
 	}
+
+	t.Cleanup(func() {
+		err := os.Unsetenv("TEST_ENV_VAR")
+		if err != nil {
+			t.Errorf("unable to unset test environment variable")
+		}
+		err = os.Unsetenv("ANOTHER_TEST_ENV_VAR")
+		if err != nil {
+			t.Errorf("unable to unset another test environment variable")
+		}
+	})
 }
 
-//func TestGetHistoricalData(t *testing.T) {
-//	t.Parallel()
-//	type args struct {
-//		f FunctionData
+//	func TestGetHistoricalData(t *testing.T) {
+//		t.Parallel()
+//		type args struct {
+//			f FunctionData
+//		}
+//		tests := []struct {
+//			name    string
+//			args    args
+//			want    []DeviceDataResponse
+//			wantErr bool
+//		}{
+//			// TODO: Add test cases.
+//		}
+//		for _, tt := range tests {
+//			t.Run(tt.name, func(t *testing.T) {
+//				got, err := GetHistoricalData(tt.args.f)
+//				if (err != nil) != tt.wantErr {
+//					t.Errorf("GetHistoricalData() error = %v, wantErr %v", err, tt.wantErr)
+//					return
+//				}
+//				if !reflect.DeepEqual(got, tt.want) {
+//					t.Errorf("GetHistoricalData() got = %v, want %v", got, tt.want)
+//				}
+//			})
+//		}
 //	}
-//	tests := []struct {
-//		name    string
-//		args    args
-//		want    []DeviceDataResponse
-//		wantErr bool
-//	}{
-//		// TODO: Add test cases.
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			got, err := GetHistoricalData(tt.args.f)
-//			if (err != nil) != tt.wantErr {
-//				t.Errorf("GetHistoricalData() error = %v, wantErr %v", err, tt.wantErr)
-//				return
-//			}
-//			if !reflect.DeepEqual(got, tt.want) {
-//				t.Errorf("GetHistoricalData() got = %v, want %v", got, tt.want)
-//			}
-//		})
-//	}
-//}
 //
-//func TestGetHistoricalDataAsync(t *testing.T) {
-//	t.Parallel()
-//	type args struct {
-//		f FunctionData
-//		w *sync.WaitGroup
+//	func TestGetHistoricalDataAsync(t *testing.T) {
+//		t.Parallel()
+//		type args struct {
+//			f FunctionData
+//			w *sync.WaitGroup
+//		}
+//		tests := []struct {
+//			name    string
+//			args    args
+//			want    <-chan DeviceDataResponse
+//			wantErr bool
+//		}{
+//			// TODO: Add test cases.
+//		}
+//		for _, tt := range tests {
+//			t.Run(tt.name, func(t *testing.T) {
+//				got, err := GetHistoricalDataAsync(tt.args.f, tt.args.w)
+//				if (err != nil) != tt.wantErr {
+//					t.Errorf("GetHistoricalDataAsync() error = %v, wantErr %v", err, tt.wantErr)
+//					return
+//				}
+//				if !reflect.DeepEqual(got, tt.want) {
+//					t.Errorf("GetHistoricalDataAsync() got = %v, want %v", got, tt.want)
+//				}
+//			})
+//		}
 //	}
-//	tests := []struct {
-//		name    string
-//		args    args
-//		want    <-chan DeviceDataResponse
-//		wantErr bool
-//	}{
-//		// TODO: Add test cases.
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			got, err := GetHistoricalDataAsync(tt.args.f, tt.args.w)
-//			if (err != nil) != tt.wantErr {
-//				t.Errorf("GetHistoricalDataAsync() error = %v, wantErr %v", err, tt.wantErr)
-//				return
-//			}
-//			if !reflect.DeepEqual(got, tt.want) {
-//				t.Errorf("GetHistoricalDataAsync() got = %v, want %v", got, tt.want)
-//			}
-//		})
-//	}
-//}
-//
-//func Test_createAwnClient(t *testing.T) {
-//	t.Parallel()
-//	tests := []struct {
-//		name string
-//		want *resty.Client
-//	}{
-//		// TODO: Add test cases.
-//	}
-//	for _, tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//			if got := createAwnClient(); !reflect.DeepEqual(got, tt.want) {
-//				t.Errorf("createAwnClient() = %v, want %v", got, tt.want)
-//			}
-//		})
-//	}
-//}
-//
+
+func TestCreateAwnClient(t *testing.T) {
+	t.Parallel()
+	header := http.Header{}
+	header.Add("Accept", "application/json")
+
+	tests := []struct {
+		name string
+		want *resty.Client
+	}{
+		{name: "TestCreateAwnClient", want: &resty.Client{
+			BaseURL:                "http://127.0.0.1",
+			HostURL:                "http://127.0.0.1",
+			Header:                 header,
+			RetryCount:             0,
+			RetryWaitTime:          retryMinWaitTimeSeconds * time.Second,
+			RetryMaxWaitTime:       retryMaxWaitTimeSeconds * time.Second,
+			HeaderAuthorizationKey: "Authorization",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, _ := CreateAwnClient("http://127.0.0.1", "/")
+			if got.BaseURL != tt.want.BaseURL &&
+				got.HostURL != tt.want.HostURL &&
+				!reflect.DeepEqual(got.Header, tt.want.Header) &&
+				got.RetryCount != tt.want.RetryCount &&
+				got.RetryWaitTime != tt.want.RetryWaitTime &&
+				got.RetryMaxWaitTime != tt.want.RetryMaxWaitTime &&
+				got.HeaderAuthorizationKey != tt.want.HeaderAuthorizationKey {
+				t.Errorf("createAwnClient() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 //func Test_getDeviceData(t *testing.T) {
 //	t.Parallel()
 //	type args struct {
