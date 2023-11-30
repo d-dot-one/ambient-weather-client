@@ -131,7 +131,6 @@ func CreateAwnClient(url string, version string) (*resty.Client, error) {
 					r.StatusCode() >= http.StatusInternalServerError ||
 					r.StatusCode() == http.StatusTooManyRequests
 			})
-	// todo: check for a valid client before returning
 
 	return client, nil
 }
@@ -274,8 +273,6 @@ func getDeviceData(ctx context.Context, funcData FunctionData, url string, versi
 		wrappedErr := fmt.Errorf("unable to get data from devicesEndpoint: %w", err)
 		return DeviceDataResponse{}, wrappedErr
 	}
-
-	// todo: check response for errors passed through resp
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return DeviceDataResponse{}, ErrContextTimeoutExceeded //nolint:exhaustruct

@@ -120,24 +120,6 @@ func TestGetLatestData(t *testing.T) {
 		},
 	}
 
-	//server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	//	w.WriteHeader(http.StatusOK)
-	//	_, err := w.Write([]byte(jsonData))
-	//	if err != nil {
-	//		return
-	//	}
-	//}))
-	//
-	//listener, err := net.Listen("tcp", "127.0.0.1:9998")
-	//if err != nil {
-	//	t.Errorf("unable to create listener: %v on port 9998", err)
-	//}
-	//
-	//_ = server.Listener.Close()
-	//server.Listener = listener
-	//server.Start()
-	//defer server.Close()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := GetLatestData(ctx, fd, tt.baseURL, tt.version)
@@ -175,7 +157,7 @@ func TestGetEnvVar(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := GetEnvVar(tt.args.key, tt.args.fallback); got != tt.want {
+			if got := GetEnvVar(tt.args.key); got != tt.want {
 				t.Errorf("GetEnvVar() = %v, want %v", got, tt.want)
 			}
 		})

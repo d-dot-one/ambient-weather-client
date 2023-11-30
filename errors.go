@@ -35,8 +35,6 @@ type ClientError struct {
 	err   error
 }
 
-// todo: should all of the be passing a pointer?
-
 // Error is a public function that returns the error message.
 func (c ClientError) Error() string {
 	switch c.kind {
@@ -61,7 +59,7 @@ func (c ClientError) Error() string {
 
 // from is a private function that returns an error with a particular location and the
 // underlying error.
-func (c ClientError) from(pos int, err error) ClientError {
+func (c ClientError) from(pos int, err error) ClientError { //nolint:unused
 	ce := c
 	ce.value = pos
 	ce.err = err
@@ -69,7 +67,7 @@ func (c ClientError) from(pos int, err error) ClientError {
 }
 
 // with is a private function that returns an error with a particular value.
-func (c ClientError) with(val int) ClientError {
+func (c ClientError) with(val int) ClientError { //nolint:unused
 	ce := c
 	ce.value = val
 	return ce
