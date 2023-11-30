@@ -152,7 +152,7 @@ func TestGetEnvVar(t *testing.T) {
 		want string
 	}{
 		{"TestGetEnvVar", args{"TEST_ENV_VAR"}, "test"},
-		{"TestGetEnvVarEmpty", args{"TEST_ENV_VAR_EMPTY"}, "fallback"},
+		{"TestGetEnvVarEmpty", args{"TEST_ENV_VAR_EMPTY"}, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
