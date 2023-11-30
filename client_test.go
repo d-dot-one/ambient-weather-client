@@ -144,16 +144,15 @@ func TestGetEnvVar(t *testing.T) {
 	}
 
 	type args struct {
-		key      string
-		fallback string
+		key string
 	}
 	tests := []struct {
 		name string
 		args args
 		want string
 	}{
-		{"TestGetEnvVar", args{"TEST_ENV_VAR", "fallback"}, "test"},
-		{"TestGetEnvVarEmpty", args{"TEST_ENV_VAR_EMPTY", "fallback"}, "fallback"},
+		{"TestGetEnvVar", args{"TEST_ENV_VAR"}, "test"},
+		{"TestGetEnvVarEmpty", args{"TEST_ENV_VAR_EMPTY"}, "fallback"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
