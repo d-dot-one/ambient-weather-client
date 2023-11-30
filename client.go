@@ -9,6 +9,7 @@ package awn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -21,14 +22,6 @@ import (
 )
 
 const (
-	// apiVersion is a string and describes the version of the API that Ambient
-	// Weather is using.
-	//apiVersion = "/v1"
-
-	// baseURL The base URL for the Ambient Weather API (Not the real-time API)
-	// as a string.
-	//baseURL = "https://rt.ambientweather.net"
-
 	// debugMode Enable verbose logging by setting this boolean value to true.
 	debugMode = false
 
@@ -52,36 +45,6 @@ const (
 	// retryMinWaitTimeSeconds An integer describing the minimum time to wait
 	// to retry an API call, in seconds.
 	retryMinWaitTimeSeconds = 5
-)
-
-var (
-	// ErrContextTimeoutExceeded is an error message that is returned when
-	// the context has timed out.
-	ErrContextTimeoutExceeded = errors.New("context timeout exceeded")
-
-	// ErrMalformedDate is a custom error and message that is returned when a
-	// date is passed that does not conform to the required format.
-	ErrMalformedDate = errors.New("date format is malformed. should be YYYY-MM-DD")
-
-	// ErrRegexFailed is a custom error and message that is returned when regex
-	// fails catastrophically.
-	ErrRegexFailed = errors.New("regex failed")
-
-	// ErrAPIKeyMissing is a custom error and message that is returned when no API key is
-	// passed to a function that requires it.
-	ErrAPIKeyMissing = errors.New("api key is missing")
-
-	// ErrAppKeyMissing is a custom error and message that is returned when no application
-	// key is passed to a function that requires it.
-	ErrAppKeyMissing = errors.New("application key is missing")
-
-	// ErrInvalidDateFormat is a custom error and message that is returned when the date
-	// is not passed as an epoch time in milliseconds.
-	ErrInvalidDateFormat = errors.New("date is invalid. It should be in epoch time in milliseconds")
-
-	// ErrMacAddressMissing is a custom error and message that is returned when no MAC
-	// address is passed to a function that requires it.
-	ErrMacAddressMissing = errors.New("mac address missing")
 )
 
 type (
@@ -122,18 +85,26 @@ func (y YearMonthDay) String() string {
 // Basic Usage:
 //
 //	epochTime, err := ConvertTimeToEpoch("2023-01-01")
-func ConvertTimeToEpoch(t string) (int64, error) {
-	ok, err := YearMonthDay(t).verify()
-	_ = CheckReturn(err, "unable to verify date", "warning")
-
-	if !ok {
-		log.Fatalf("invalid date format, %v should be YYYY-MM-DD", t)
+func ConvertTimeToEpoch(tte string) (int64, error) {
+	ok, err := YearMonthDay(tte).verify() //nolint:varnamelen
+	if err != nil {
+		log.Printf("unable to verify date")
+		err = fmt.Errorf("unable to verify date: %w", err)
+		return 0, err
 	}
 
-	parsed, err := time.Parse(time.DateOnly, t)
-	_ = CheckReturn(err, "unable to parse time", "warning")
+	if !ok {
+		log.Fatalf("invalid date format, %v should be YYYY-MM-DD", tte)
+	}
 
-	return parsed.UnixMilli(), err
+	parsed, err := time.Parse(time.DateOnly, tte)
+	if err != nil {
+		log.Printf("unable to parse time")
+		err = fmt.Errorf("unable to parse time: %w", err)
+		return 0, err
+	}
+
+	return parsed.UnixMilli(), nil
 }
 
 // CreateAwnClient is a public function that is used to create a new resty-based API
@@ -160,6 +131,7 @@ func CreateAwnClient(url string, version string) (*resty.Client, error) {
 					r.StatusCode() >= http.StatusInternalServerError ||
 					r.StatusCode() == http.StatusTooManyRequests
 			})
+	// todo: check for a valid client before returning
 
 	return client, nil
 }
@@ -178,32 +150,6 @@ func CreateAPIConfig(api string, app string) *FunctionData {
 	fd.App = app
 
 	return fd
-}
-
-// CheckReturn is a public function to remove the usual error checking cruft while also
-// logging the error message. It takes an error, a message and a log level as inputs and
-// returns an error (can be nil of course). You can then use the err message for custom
-// handling of the error.
-//
-// Basic Usage:
-//
-//	err = CheckReturn(err, "unable to get device data", "warning")
-func CheckReturn(err error, msg string, level LogLevelForError) error {
-	if err != nil {
-		switch level {
-		case "panic":
-			log.Panicf("%v: %v", msg, err)
-		case "fatal":
-			log.Fatalf("%v: %v", msg, err)
-		case "warning":
-			log.Printf("%v: %v\n", msg, err)
-		case "info":
-			log.Printf("%v: %v\n", msg, err)
-		case "debug":
-			log.Printf("%v: %x\n", msg, err)
-		}
-	}
-	return err
 }
 
 // CheckResponse is a public function that will take an API response and evaluate it
@@ -254,23 +200,31 @@ func CheckResponse(resp map[string]string) (bool, error) {
 //	data, err := awn.GetLatestData(ctx, ApiConfig, baseURL, apiVersion)
 func GetLatestData(ctx context.Context, funcData FunctionData, url string, version string) (*AmbientDevice, error) {
 	client, err := CreateAwnClient(url, version)
-	_ = CheckReturn(err, "unable to create client", "warning")
+	if err != nil {
+		log.Printf("unable to create client")
+		wrappedErr := fmt.Errorf("unable to create client: %w", err)
+		return nil, wrappedErr
+	}
 
 	client.R().SetQueryParams(map[string]string{
 		"apiKey":         funcData.API,
 		"applicationKey": funcData.App,
 	})
 
-	deviceData := &AmbientDevice{}
+	deviceData := new(AmbientDevice)
 
 	_, err = client.R().SetResult(deviceData).Get(devicesEndpoint)
-	_ = CheckReturn(err, "unable to handle data from devicesEndpoint", "warning")
+	if err != nil {
+		log.Printf("unable to get data from devicesEndpoint")
+		wrappedErr := fmt.Errorf("unable to get data from devicesEndpoint: %w", err)
+		return nil, wrappedErr
+	}
 
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return nil, errors.New("context timeout exceeded")
 	}
 
-	return deviceData, err
+	return deviceData, nil
 }
 
 // getDeviceData is a private function takes a context object, a FunctionData object, a URL
@@ -294,7 +248,10 @@ func GetLatestData(ctx context.Context, funcData FunctionData, url string, versi
 //	resp, err := getDeviceData(ctx, apiConfig)
 func getDeviceData(ctx context.Context, funcData FunctionData, url string, version string) (DeviceDataResponse, error) {
 	client, err := CreateAwnClient(url, version)
-	_ = CheckReturn(err, "unable to create client", "warning")
+	if err != nil {
+		log.Printf("unable to create client")
+		return DeviceDataResponse{}, err
+	}
 
 	client.R().SetQueryParams(map[string]string{
 		"apiKey":         funcData.API,
@@ -303,7 +260,7 @@ func getDeviceData(ctx context.Context, funcData FunctionData, url string, versi
 		"limit":          strconv.Itoa(funcData.Limit),
 	})
 
-	deviceData := &DeviceDataResponse{}
+	deviceData := new(DeviceDataResponse)
 
 	_, err = client.R().
 		SetPathParams(map[string]string{
@@ -312,15 +269,19 @@ func getDeviceData(ctx context.Context, funcData FunctionData, url string, versi
 		}).
 		SetResult(deviceData).
 		Get("{devicesEndpoint}/{macAddress}")
-	_ = CheckReturn(err, "unable to handle data from the devices endpoint", "warning")
-
-	//CheckResponse(resp) // todo: check response for errors passed through resp
-
-	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-		return DeviceDataResponse{}, ErrContextTimeoutExceeded
+	if err != nil {
+		log.Printf("unable to get data from devicesEndpoint")
+		wrappedErr := fmt.Errorf("unable to get data from devicesEndpoint: %w", err)
+		return DeviceDataResponse{}, wrappedErr
 	}
 
-	return *deviceData, err
+	// todo: check response for errors passed through resp
+
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return DeviceDataResponse{}, ErrContextTimeoutExceeded //nolint:exhaustruct
+	}
+
+	return *deviceData, nil
 }
 
 // GetHistoricalData is a public function that takes a context object, a FunctionData
@@ -335,14 +296,22 @@ func getDeviceData(ctx context.Context, funcData FunctionData, url string, versi
 //	ctx := createContext()
 //	apiConfig := awn.CreateApiConfig(apiKey, appKey)
 //	resp, err := GetHistoricalData(ctx, apiConfig)
-func GetHistoricalData(ctx context.Context, funcData FunctionData, url string, version string) ([]DeviceDataResponse, error) {
+func GetHistoricalData(
+	ctx context.Context,
+	funcData FunctionData,
+	url string,
+	version string) ([]DeviceDataResponse, error) {
 	var deviceResponse []DeviceDataResponse
 
 	for i := funcData.Epoch; i <= time.Now().UnixMilli(); i += epochIncrement24h {
 		funcData.Epoch = i
 
 		resp, err := getDeviceData(ctx, funcData, url, version)
-		_ = CheckReturn(err, "unable to get device data", "warning")
+		if err != nil {
+			log.Printf("unable to get device data")
+			wrappedErr := fmt.Errorf("unable to get device data: %w", err)
+			return nil, wrappedErr
+		}
 
 		deviceResponse = append(deviceResponse, resp)
 	}
@@ -376,7 +345,10 @@ func GetHistoricalDataAsync(
 			funcData.Epoch = i
 
 			resp, err := getDeviceData(ctx, funcData, url, version)
-			_ = CheckReturn(err, "unable to get device data", "warning")
+			if err != nil {
+				log.Printf("unable to get device data: %v", err)
+				break
+			}
 
 			out <- resp
 		}
@@ -395,7 +367,10 @@ func GetEnvVars(vars []string) map[string]string {
 	envVars := make(map[string]string)
 
 	for v := range vars {
-		value := GetEnvVar(vars[v], "")
+		value := GetEnvVar(vars[v])
+		if value == "" {
+			log.Printf("environment variable %v is empty or not set", vars[v])
+		}
 		envVars[vars[v]] = value
 	}
 
@@ -403,15 +378,15 @@ func GetEnvVars(vars []string) map[string]string {
 }
 
 // GetEnvVar is a public function attempts to fetch an environment variable. If that
-// environment variable is not found, it will return 'fallback'.
+// environment variable is not found, it will return an empty string.
 //
 // Basic Usage:
 //
 //	environmentVariable := GetEnvVar("ENV_VAR_1", "fallback")
-func GetEnvVar(key string, fallback string) string {
+func GetEnvVar(key string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {
-		value = fallback
+		value = ""
 	}
 
 	return value

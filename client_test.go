@@ -3,7 +3,6 @@ package awn
 import (
 	"context"
 	"errors"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -17,7 +16,7 @@ import (
 func TestConvertTimeToEpoch(t *testing.T) {
 	tests := []struct {
 		name string
-		t    YearMonthDay
+		t    string
 		want int64
 	}{
 		{"Test01Jan2014ToEpoch", "2014-01-01", 1388534400000},
@@ -36,7 +35,7 @@ func TestConvertTimeToEpochBadFormat(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name string
-		t    YearMonthDay
+		t    string
 		want error
 	}{
 		{"TestWrongDateFormat", "11-15-2021", ErrMalformedDate},
@@ -49,31 +48,6 @@ func TestConvertTimeToEpochBadFormat(t *testing.T) {
 			if err == nil {
 				t.Errorf("ConvertTimeToEpoch() = %v, want %v", err, tt.want)
 			}
-		})
-	}
-}
-
-func TestCheckReturn(t *testing.T) {
-	t.Parallel()
-
-	type args struct {
-		e     error
-		msg   LogMessage
-		level LogLevelForError
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{"TestCheckReturnDebug", args{nil, "Debug log message", "debug"}},
-		{"TestCheckReturnInfo", args{nil, "Info log message", "info"}},
-		{"TestCheckReturnWarning", args{nil, "Warning log message", "warning"}},
-		{"TestCheckReturnFatal", args{nil, "Fatal log message", "fatal"}},
-		{"TestCheckReturnPanic", args{nil, "Panic log message", "panic"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			_ = CheckReturn(tt.args.e, tt.args.msg, tt.args.level)
 		})
 	}
 }
@@ -121,6 +95,12 @@ func TestGetLatestData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	s := httptest.NewServer(
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Write([]byte(jsonData))
+		}))
+	defer s.Close()
+
 	type Tests struct {
 		name     string
 		baseURL  string
@@ -132,7 +112,7 @@ func TestGetLatestData(t *testing.T) {
 	tests := []Tests{
 		{
 			name:     "basic-request",
-			baseURL:  "http://127.0.0.1:9998",
+			baseURL:  s.URL,
 			ctx:      ctx,
 			version:  "/v1",
 			response: &AmbientDevice{},
@@ -140,23 +120,23 @@ func TestGetLatestData(t *testing.T) {
 		},
 	}
 
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, err := w.Write([]byte(jsonData))
-		if err != nil {
-			return
-		}
-	}))
-
-	listener, err := net.Listen("tcp", "127.0.0.1:9998")
-	if err != nil {
-		t.Errorf("unable to create listener: %v on port 9998", err)
-	}
-
-	_ = server.Listener.Close()
-	server.Listener = listener
-	server.Start()
-	defer server.Close()
+	//server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//	w.WriteHeader(http.StatusOK)
+	//	_, err := w.Write([]byte(jsonData))
+	//	if err != nil {
+	//		return
+	//	}
+	//}))
+	//
+	//listener, err := net.Listen("tcp", "127.0.0.1:9998")
+	//if err != nil {
+	//	t.Errorf("unable to create listener: %v on port 9998", err)
+	//}
+	//
+	//_ = server.Listener.Close()
+	//server.Listener = listener
+	//server.Start()
+	//defer server.Close()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -314,7 +294,6 @@ func TestCreateAwnClient(t *testing.T) {
 	}{
 		{name: "TestCreateAwnClient", want: &resty.Client{
 			BaseURL:                "http://127.0.0.1",
-			HostURL:                "http://127.0.0.1",
 			Header:                 header,
 			RetryCount:             0,
 			RetryWaitTime:          retryMinWaitTimeSeconds * time.Second,
@@ -326,7 +305,6 @@ func TestCreateAwnClient(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, _ := CreateAwnClient("http://127.0.0.1", "/")
 			if got.BaseURL != tt.want.BaseURL &&
-				got.HostURL != tt.want.HostURL &&
 				!reflect.DeepEqual(got.Header, tt.want.Header) &&
 				got.RetryCount != tt.want.RetryCount &&
 				got.RetryWaitTime != tt.want.RetryWaitTime &&

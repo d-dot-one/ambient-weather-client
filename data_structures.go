@@ -2,6 +2,7 @@ package awn
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func (f FunctionData) ToMap() map[string]interface{} {
 	}
 }
 
-// NewFunctionData creates a new FunctionData object with some default values and return
+// NewFunctionData creates a new FunctionData object with bare default values and return
 // it to the caller as a pointer.
 func NewFunctionData() *FunctionData {
 	return &FunctionData{
@@ -174,7 +175,9 @@ type AmbientDevice struct {
 // String is a helper function to print the AmbientDevice struct as a string.
 func (a AmbientDevice) String() string {
 	r, err := json.Marshal(a)
-	_ = CheckReturn(err, "unable to marshall json from AmbientDevice", "warning")
+	if err != nil {
+		log.Printf("unable to marshall json from AmbientDevice: %v", err)
+	}
 
 	return string(r)
 }
