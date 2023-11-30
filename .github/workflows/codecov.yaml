@@ -1,0 +1,49 @@
+name: code-coverage
+
+on: [push]
+
+jobs:
+  coverage:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: .
+        shell: bash
+    env:
+      OS: ${{ matrix.os }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c  # v3
+        with:
+          fetch-depth: 2
+
+      - name: install go
+        uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe # v4.1.0
+        with:
+          go-version: '^1.21.0'
+
+      - name: install dependencies
+        run: go mod download
+
+      - name: build
+        run: go build ./...
+
+      - name: test
+        run: go test ./...
+
+      - name: coverage
+        run: go test -v -race -covermode=atomic -buildvcs -coverprofile=./artifacts/coverage.out ./...
+
+      - name: upload coverage reports
+        uses: codecov/codecov-action@eaaf4bedf32dbdc6b720b63067d99c4d77d6047d  # v3.1.4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+        with:
+          directory: ./artifacts
+          files: coverage.out
+          name: ${{ github.repository }}
+          verbose: true

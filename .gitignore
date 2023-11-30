@@ -1,8 +1,10 @@
 # OS
 .DS_Store
 
-# git
+# Sensitive files
 .gitconfig-awn
+go.work
+.envrc
 
 # Binaries for programs and plugins
 *.exe
@@ -13,16 +15,10 @@
 
 # Test binary, built with `go test -c`
 *.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
+testing.*
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
-
-# Go workspace and environment
-go.work
-.envrc
 
 # ide
 .idea/

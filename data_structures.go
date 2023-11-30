@@ -2,6 +2,7 @@ package awn
 
 import (
 	"encoding/json"
+	"log"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func (f FunctionData) ToMap() map[string]interface{} {
 	}
 }
 
-// NewFunctionData creates a new FunctionData object with some default values and return
+// NewFunctionData creates a new FunctionData object with bare default values and return
 // it to the caller as a pointer.
 func NewFunctionData() *FunctionData {
 	return &FunctionData{
@@ -49,7 +50,7 @@ func NewFunctionData() *FunctionData {
 
 // DeviceDataResponse is used to marshal/unmarshal the response from the
 // devices/macAddress endpoint.
-type DeviceDataResponse []struct {
+type DeviceDataResponse struct {
 	Baromabsin        float64   `json:"baromabsin"`
 	Baromrelin        float64   `json:"baromrelin"`
 	BattLightning     int       `json:"batt_lightning"`
@@ -165,7 +166,7 @@ type info struct {
 // AmbientDevice is a struct that is used in the marshal/unmarshal JSON. This structure
 // is not fully required, since all we use is the MacAddress field. The rest of the data
 // is thrown away.
-type AmbientDevice []struct {
+type AmbientDevice struct {
 	Info       info       `json:"info"`
 	LastData   DeviceData `json:"DeviceData"`
 	MacAddress string     `json:"macAddress"`
@@ -174,7 +175,9 @@ type AmbientDevice []struct {
 // String is a helper function to print the AmbientDevice struct as a string.
 func (a AmbientDevice) String() string {
 	r, err := json.Marshal(a)
-	_ = CheckReturn(err, "unable to marshall json from AmbientDevice", "warning")
+	if err != nil {
+		log.Printf("unable to marshall json from AmbientDevice: %v", err)
+	}
 
 	return string(r)
 }
